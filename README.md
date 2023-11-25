@@ -8,10 +8,10 @@ Why this feature ?!? Well imagine you went out with an aquaintance and made a sp
 
 Only ERC20 tokens can be deposited and used as payment and collateral.
 
-Development Environment: Hardhat
-Testing Environment: Mocha
-Assertion Library: Chai
-Smart Contract Language: Solidity
-Web3 API: Ethers.js
+Development Environment: Hardhat\
+Testing Environment: Mocha\
+Assertion Library: Chai\
+Smart Contract Language: Solidity\
+Web3 API: Ethers.js\
 Testing: Typescript, Hardhat, Ethers
 
