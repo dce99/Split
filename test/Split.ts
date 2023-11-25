@@ -22,27 +22,27 @@ const tokenAddress = {
 const lockTime = Date.now() + 5 * 24 * 60 * 60 * 60;
 const totalSplitAmount = ethers.parseEther("50");
 const splitDescription = (num: number) => "Split " + num;
-const Participants = [
-    { participant: "", owedAmount: ethers.parseEther("10"), collateral: ethers.parseEther("1") }, { participant: "", owedAmount: ethers.parseEther("20"), collateral: ethers.parseEther("2") }, { participant: "", owedAmount: ethers.parseEther("20"), collateral: ethers.parseEther("2") }
+const Borrowers = [
+    { borrower: "", owedAmount: ethers.parseEther("10"), collateral: ethers.parseEther("1") }, { borrower: "", owedAmount: ethers.parseEther("20"), collateral: ethers.parseEther("2") }, { borrower: "", owedAmount: ethers.parseEther("20"), collateral: ethers.parseEther("2") }
 ]
 
-function modifyParticipantsAddress(addr1: string, addr2: string, addr3: string) {
-    Participants[0].participant = addr1;
-    Participants[1].participant = addr2;
-    Participants[2].participant = addr3;
+function modifyBorrowersAddress(addr1: string, addr2: string, addr3: string) {
+    Borrowers[0].borrower = addr1;
+    Borrowers[1].borrower = addr2;
+    Borrowers[2].borrower = addr3;
 }
 
-async function createSplit(split: any, splitNumber: number, addr1: any, addr2: any, addr3: any, zeroCollateral?: boolean, diffTokenAddress?: string, diffLockTime?: number, diffParticipants?: [], diffSplitAmount?: number) {
-    modifyParticipantsAddress(addr1.address, addr2.address, addr3.address);
+async function createSplit(split: any, splitNumber: number, addr1: any, addr2: any, addr3: any, zeroCollateral?: boolean, diffTokenAddress?: string, diffLockTime?: number, diffBorrowers?: [], diffSplitAmount?: number) {
+    modifyBorrowersAddress(addr1.address, addr2.address, addr3.address);
     const time = diffLockTime ?? lockTime;
-    const participants = diffParticipants ?? Participants;
+    const borrowers = diffBorrowers ?? Borrowers;
     const splitAmount = diffSplitAmount ?? totalSplitAmount;
     const token = diffTokenAddress ?? tokenAddress.USDT;
 
-    if (zeroCollateral) Participants[0].collateral = ethers.parseEther("0");
-    else Participants[0].collateral = ethers.parseEther("1");
+    if (zeroCollateral) Borrowers[0].collateral = ethers.parseEther("0");
+    else Borrowers[0].collateral = ethers.parseEther("1");
 
-    const tx = split.createSplit(token, splitAmount, time, splitDescription(splitNumber), participants);
+    const tx = split.createSplit(token, splitAmount, time, splitDescription(splitNumber), borrowers);
     return tx;
 }
 
@@ -78,11 +78,11 @@ describe("Split", function () {
             await expect(tx).to.be.revertedWithCustomError(split, 'InvalidLockTime');
         });
 
-        it("Should revert with InvalidParticipantsCount", async function () {
+        it("Should revert with InvalidBorrowersCount", async function () {
             const { split, addr1, addr2, addr3 } = await loadFixture(deploySplit);
 
             const tx = createSplit(split, 1, addr1, addr2, addr3, false, undefined, undefined, []);
-            await expect(tx).to.be.revertedWithCustomError(split, "InvalidParticipantsCount");
+            await expect(tx).to.be.revertedWithCustomError(split, "InvalidBorrowersCount");
         });
 
         it("Should revert with ZeroSplitAmount", async function () {
@@ -123,7 +123,7 @@ describe("Split", function () {
         it("Should not read split general data by anyone", async function () {
             const { split, addr1, addr2, addr3 } = await loadFixture(deploySplit);
 
-            const tx = await split.connect(addr1).createSplit(tokenAddress.USDT, 10, lockTime, splitDescription(1), [{ participant: addr2.address, owedAmount: 10, collateral: 1 }]);
+            const tx = await split.connect(addr1).createSplit(tokenAddress.USDT, 10, lockTime, splitDescription(1), [{ borrower: addr2.address, owedAmount: 10, collateral: 1 }]);
             await tx.wait();
             const mySplits = await split.connect(addr1).getMySplits(0, 5);
 
@@ -147,21 +147,21 @@ describe("Split", function () {
             expect(splitData.baseTokenAddress).to.be.equal(await ethers.getAddress(tokenAddress.USDT));
             expect(splitData.splitName).to.be.equal(mySplits[0]);
             expect(splitData.remainingPayments).to.be.equal(3);
-            expect(splitData.participants[0].participant).to.be.equal(Participants[0].participant);
-            expect(splitData.participants[0].owedAmount).to.be.equal(Participants[0].owedAmount);
-            expect(splitData.participants[0].collateral).to.be.equal(Participants[0].collateral);
-            expect(splitData.participants[1].participant).to.be.equal(Participants[1].participant);
-            expect(splitData.participants[1].owedAmount).to.be.equal(Participants[1].owedAmount);
-            expect(splitData.participants[1].collateral).to.be.equal(Participants[1].collateral);
-            expect(splitData.participants[2].participant).to.be.equal(Participants[2].participant);
-            expect(splitData.participants[2].owedAmount).to.be.equal(Participants[2].owedAmount);
-            expect(splitData.participants[2].collateral).to.be.equal(Participants[2].collateral);
+            expect(splitData.borrowers[0].borrower).to.be.equal(Borrowers[0].borrower);
+            expect(splitData.borrowers[0].owedAmount).to.be.equal(Borrowers[0].owedAmount);
+            expect(splitData.borrowers[0].collateral).to.be.equal(Borrowers[0].collateral);
+            expect(splitData.borrowers[1].borrower).to.be.equal(Borrowers[1].borrower);
+            expect(splitData.borrowers[1].owedAmount).to.be.equal(Borrowers[1].owedAmount);
+            expect(splitData.borrowers[1].collateral).to.be.equal(Borrowers[1].collateral);
+            expect(splitData.borrowers[2].borrower).to.be.equal(Borrowers[2].borrower);
+            expect(splitData.borrowers[2].owedAmount).to.be.equal(Borrowers[2].owedAmount);
+            expect(splitData.borrowers[2].collateral).to.be.equal(Borrowers[2].collateral);
         });
 
         it("Should not read split borrower data by other than borrowers", async function () {
             const { split, addr1, addr2, addr3 } = await loadFixture(deploySplit);
 
-            const tx = await split.connect(addr1).createSplit(tokenAddress.USDT, 10, lockTime, splitDescription(1), [{ participant: addr2.address, owedAmount: 10, collateral: 1 }]);
+            const tx = await split.connect(addr1).createSplit(tokenAddress.USDT, 10, lockTime, splitDescription(1), [{ borrower: addr2.address, owedAmount: 10, collateral: 1 }]);
             await tx.wait();
             const mySplits = await split.connect(addr2).getMySplits(0, 5);
 
@@ -172,7 +172,7 @@ describe("Split", function () {
         it("Should not read split borrower data for creator by other than split creator", async function () {
             const { split, addr1, addr2, addr3 } = await loadFixture(deploySplit);
 
-            const tx = await split.createSplit(tokenAddress.USDT, 10, lockTime, splitDescription(1), [{ participant: addr2.address, owedAmount: 10, collateral: 1 }]);
+            const tx = await split.createSplit(tokenAddress.USDT, 10, lockTime, splitDescription(1), [{ borrower: addr2.address, owedAmount: 10, collateral: 1 }]);
             await tx.wait();
             const mySplits = await split.connect(addr2).getMySplits(0, 5);
 

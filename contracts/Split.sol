@@ -9,8 +9,8 @@ contract Split {
     address payable public owner;
     uint256 nonce;
 
-    struct Participant {
-        address participant;
+    struct Borrower {
+        address borrower;
         uint owedAmount;
         uint collateral;
     }
@@ -21,10 +21,10 @@ contract Split {
         uint totalSplitAmount;
         uint lockTime;
         string splitDescription;
-        Participant[] participants;
+        Borrower[] borrowers;
         bytes32 splitName;
         uint remainingPayments;
-        mapping(address => bool) vaildParticipant;
+        mapping(address => bool) vaildBorrower;
         mapping(address => uint) individualOwedAmount; /// @dev in base token
         mapping(address => uint) individualCollateral; /// @dev in base token
         mapping(address => bool) agreementApproved; /// @dev borrower agrees the contract of split made by creator against him, after approving contract to spend collateral amount
@@ -42,7 +42,7 @@ contract Split {
         uint lockTime;
         string splitDescription;
         uint remainingPayments;
-        Participant[] participants;
+        Borrower[] borrowers;
     }
 
     struct SplitBorrowerData {
@@ -60,7 +60,7 @@ contract Split {
 
     error AgreementHasZeroCollateral();
     error PenaltyAlreadyLevied();
-    error InvalidParticipantsCount(uint given, uint min, uint max);
+    error InvalidBorrowersCount(uint given, uint min, uint max);
     error ZeroSplitAmount();
     error EmptySplitName();
     error SplitNameNotFound();
@@ -91,8 +91,8 @@ contract Split {
         _;
     }
 
-    modifier onlyValidParticipant(bytes32 splitName) {
-        if (!splits[splitName].vaildParticipant[msg.sender])
+    modifier onlyValidBorrower(bytes32 splitName) {
+        if (!splits[splitName].vaildBorrower[msg.sender])
             revert OnlySplitBorrowersCanPerformOperation();
         _;
     }
@@ -131,12 +131,12 @@ contract Split {
         uint totalSplitAmount,
         uint lockTime,
         string calldata splitDescription,
-        Participant[] calldata participants
+        Borrower[] calldata borrowers
     ) external {
-        uint totalParticipants = participants.length;
-        if (totalParticipants > 1000 || totalParticipants < 1) {
-            revert InvalidParticipantsCount({
-                given: totalParticipants,
+        uint totalBorrowers = borrowers.length;
+        if (totalBorrowers > 1000 || totalBorrowers < 1) {
+            revert InvalidBorrowersCount({
+                given: totalBorrowers,
                 min: 1,
                 max: 1000
             });
@@ -156,26 +156,26 @@ contract Split {
         split.splitName = splitName;
         split.splitDescription = splitDescription;
         split.lockTime = lockTime;
-        split.remainingPayments = totalParticipants;
+        split.remainingPayments = totalBorrowers;
 
         mySplits[msg.sender].push(splitName);
-        for (uint i = 0; i < totalParticipants; ) {
+        for (uint i = 0; i < totalBorrowers; ) {
             split.individualOwedAmount[
-                participants[i].participant
-            ] = participants[i].owedAmount;
+                borrowers[i].borrower
+            ] = borrowers[i].owedAmount;
             split.individualCollateral[
-                participants[i].participant
-            ] = participants[i].collateral;
-            mySplits[participants[i].participant].push(splitName);
-            split.participants.push(participants[i]);
-            split.vaildParticipant[participants[i].participant] = true;
+                borrowers[i].borrower
+            ] = borrowers[i].collateral;
+            mySplits[borrowers[i].borrower].push(splitName);
+            split.borrowers.push(borrowers[i]);
+            split.vaildBorrower[borrowers[i].borrower] = true;
             ++i;
         }
     }
 
     function approveAgreement(
         bytes32 splitName
-    ) external invalidSplitName(splitName) onlyValidParticipant(splitName) {
+    ) external invalidSplitName(splitName) onlyValidBorrower(splitName) {
         if (splits[splitName].agreementApproved[msg.sender])
             revert AgreementAlreadyApproved();
 
@@ -210,7 +210,7 @@ contract Split {
 
     function approvePayment(
         bytes32 splitName
-    ) external invalidSplitName(splitName) onlyValidParticipant(splitName) {
+    ) external invalidSplitName(splitName) onlyValidBorrower(splitName) {
         if (!splits[splitName].agreementApproved[msg.sender])
             revert AgreementNotApprovedByBorrower();
         if (splits[splitName].paidStatus[msg.sender]) revert AlreadyPaid();
@@ -296,7 +296,7 @@ contract Split {
 
     function withdrawCollateral(
         bytes32 splitName
-    ) external invalidSplitName(splitName) onlyValidParticipant(splitName) {
+    ) external invalidSplitName(splitName) onlyValidBorrower(splitName) {
         uint collateral = splits[splitName].individualCollateral[msg.sender];
         if (!splits[splitName].agreementApproved[msg.sender])
             revert AgreementNotApprovedByBorrower();
@@ -345,7 +345,7 @@ contract Split {
         external
         view
         invalidSplitName(splitName)
-        onlyValidParticipant(splitName)
+        onlyValidBorrower(splitName)
         returns (SplitBorrowerData memory)
     {
         SplitInfo storage split = splits[splitName];
@@ -390,7 +390,7 @@ contract Split {
     {
         if (
             (msg.sender != splits[splitName].creator) &&
-            !splits[splitName].vaildParticipant[msg.sender]
+            !splits[splitName].vaildBorrower[msg.sender]
         ) revert AccessDenied();
 
         SplitInfo storage split = splits[splitName];
@@ -401,7 +401,7 @@ contract Split {
             lockTime: split.lockTime,
             totalSplitAmount: split.totalSplitAmount,
             splitDescription: split.splitDescription,
-            participants: split.participants,
+            borrowers: split.borrowers,
             remainingPayments: split.remainingPayments
         });
 
