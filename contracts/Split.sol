@@ -80,6 +80,13 @@ contract Split {
     error OnlySplitBorrowersCanPerformOperation();
     error AccessDenied();
 
+    event SplitCreated(address creator, bytes32 splitName, string splitDescription);
+    event AgreementApproved(address borrower, bytes32 splitName);
+    event PaymentApproved(address borrower, bytes32 splitName, uint amount);
+    event PaymentMade(address borrower, address creator, bytes32 splitName, uint amount);
+    event PenaltyLevied(address borrower, address creator, bytes32 splitName, uint collateral);
+    event CollateralWithdrawed(address borrower, bytes32 splitName, uint collateral);
+
     modifier onlyOwner() {
         if (msg.sender != owner) revert OnlyOwnerCanPerformOperation();
         _;
@@ -171,6 +178,8 @@ contract Split {
             split.vaildBorrower[borrowers[i].borrower] = true;
             ++i;
         }
+
+        emit SplitCreated(msg.sender, splitName, splitDescription);
     }
 
     function approveAgreement(
@@ -206,6 +215,8 @@ contract Split {
                 );
             }
         }
+
+        emit AgreementApproved(msg.sender, splitName);
     }
 
     function approvePayment(
@@ -232,6 +243,7 @@ contract Split {
                 )
             {
                 splits[splitName].paymentApproved[msg.sender] = true;
+                emit PaymentApproved(msg.sender, splitName, owedAmount);
             } catch Error(string memory reason) {
                 revert(reason);
             } catch {
@@ -259,6 +271,8 @@ contract Split {
                 "Error while transferring owed amount: No error data generated"
             );
         }
+
+        emit PaymentMade(msg.sender, splits[splitName].creator, splitName, owedAmount);
     }
 
     function levyPenalty(
@@ -292,6 +306,8 @@ contract Split {
             splits[splitName].penalyLevied[borrower] = false;
             revert("Error while levying penalty: No error data generated");
         }
+
+        emit PenaltyLevied(borrower, msg.sender, splitName, collateral);
     }
 
     function withdrawCollateral(
@@ -321,6 +337,8 @@ contract Split {
             splits[splitName].collateralWithdrawed[msg.sender] = false;
             revert("No error data generated");
         }
+
+        emit CollateralWithdrawed(msg.sender, splitName, collateral);
     }
 
     function getMySplits(
@@ -406,5 +424,9 @@ contract Split {
         });
 
         return splitData;
+    }
+
+    function getMyTotalSplits() external view returns(uint){
+        return mySplits[msg.sender].length;
     }
 }
