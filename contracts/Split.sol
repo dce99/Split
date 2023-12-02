@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.18;
 
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Split {
     /// Total Locked Amount, only visible to the contract owner.
-    address payable public owner;
+    address payable public immutable owner;
     uint256 nonce;
 
     struct Borrower {
@@ -80,12 +80,30 @@ contract Split {
     error OnlySplitBorrowersCanPerformOperation();
     error AccessDenied();
 
-    event SplitCreated(address creator, bytes32 splitName, string splitDescription);
+    event SplitCreated(
+        address creator,
+        bytes32 splitName,
+        string splitDescription
+    );
     event AgreementApproved(address borrower, bytes32 splitName);
     event PaymentApproved(address borrower, bytes32 splitName, uint amount);
-    event PaymentMade(address borrower, address creator, bytes32 splitName, uint amount);
-    event PenaltyLevied(address borrower, address creator, bytes32 splitName, uint collateral);
-    event CollateralWithdrawed(address borrower, bytes32 splitName, uint collateral);
+    event PaymentMade(
+        address borrower,
+        address creator,
+        bytes32 splitName,
+        uint amount
+    );
+    event PenaltyLevied(
+        address borrower,
+        address creator,
+        bytes32 splitName,
+        uint collateral
+    );
+    event CollateralWithdrawed(
+        address borrower,
+        bytes32 splitName,
+        uint collateral
+    );
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert OnlyOwnerCanPerformOperation();
@@ -167,12 +185,10 @@ contract Split {
 
         mySplits[msg.sender].push(splitName);
         for (uint i = 0; i < totalBorrowers; ) {
-            split.individualOwedAmount[
-                borrowers[i].borrower
-            ] = borrowers[i].owedAmount;
-            split.individualCollateral[
-                borrowers[i].borrower
-            ] = borrowers[i].collateral;
+            split.individualOwedAmount[borrowers[i].borrower] = borrowers[i]
+                .owedAmount;
+            split.individualCollateral[borrowers[i].borrower] = borrowers[i]
+                .collateral;
             mySplits[borrowers[i].borrower].push(splitName);
             split.borrowers.push(borrowers[i]);
             split.vaildBorrower[borrowers[i].borrower] = true;
@@ -203,13 +219,15 @@ contract Split {
                     address(this),
                     collateral
                 )
-            {
+            returns (bool res) {
+                if (!res)
+                    revert(
+                        "Error while approving agreement: No error data generated"
+                    );
                 // TODO add oracle code here;
             } catch Error(string memory reason) {
-                splits[splitName].agreementApproved[msg.sender] = false;
                 revert(reason);
             } catch {
-                splits[splitName].agreementApproved[msg.sender] = false;
                 revert(
                     "Error while approving agreement: No error data generated"
                 );
@@ -234,15 +252,19 @@ contract Split {
         if (allowance < owedAmount)
             revert BorrowerMustApproveContractAtleastOwedAmount();
 
-        if (!splits[splitName].paymentApproved[msg.sender])
+        if (!splits[splitName].paymentApproved[msg.sender]) {
+            splits[splitName].paymentApproved[msg.sender] = true;
             try
                 IERC20(splits[splitName].baseTokenAddress).transferFrom(
                     msg.sender,
                     address(this),
                     owedAmount
                 )
-            {
-                splits[splitName].paymentApproved[msg.sender] = true;
+            returns (bool res) {
+                if (!res)
+                    revert(
+                        "Error while approving payment: No error data generated"
+                    );
                 emit PaymentApproved(msg.sender, splitName, owedAmount);
             } catch Error(string memory reason) {
                 revert(reason);
@@ -251,6 +273,7 @@ contract Split {
                     "Error while approving payment: No error data generated"
                 );
             }
+        }
 
         splits[splitName].paidStatus[msg.sender] = true;
         splits[splitName].remainingPayments -= 1;
@@ -260,19 +283,24 @@ contract Split {
                 splits[splitName].creator,
                 owedAmount
             )
-        {} catch Error(string memory reason) {
-            splits[splitName].paidStatus[msg.sender] = false;
-            splits[splitName].remainingPayments += 1;
+        returns (bool res) {
+            if (!res)
+                revert(
+                    "Error while transferring owed amount: No error data generated"
+                );
+            emit PaymentMade(
+                msg.sender,
+                splits[splitName].creator,
+                splitName,
+                owedAmount
+            );
+        } catch Error(string memory reason) {
             revert(reason);
         } catch {
-            splits[splitName].paidStatus[msg.sender] = false;
-            splits[splitName].remainingPayments += 1;
             revert(
                 "Error while transferring owed amount: No error data generated"
             );
         }
-
-        emit PaymentMade(msg.sender, splits[splitName].creator, splitName, owedAmount);
     }
 
     function levyPenalty(
@@ -299,15 +327,15 @@ contract Split {
                 splits[splitName].creator,
                 collateral
             )
-        {} catch Error(string memory reason) {
-            splits[splitName].penalyLevied[borrower] = false;
+        returns (bool res) {
+            if (!res)
+                revert("Error while levying penalty: No error data generated");
+            emit PenaltyLevied(borrower, msg.sender, splitName, collateral);
+        } catch Error(string memory reason) {
             revert(reason);
         } catch {
-            splits[splitName].penalyLevied[borrower] = false;
             revert("Error while levying penalty: No error data generated");
         }
-
-        emit PenaltyLevied(borrower, msg.sender, splitName, collateral);
     }
 
     function withdrawCollateral(
@@ -330,15 +358,19 @@ contract Split {
                 msg.sender,
                 collateral
             )
-        {} catch Error(string memory reason) {
-            splits[splitName].collateralWithdrawed[msg.sender] = false;
+        returns (bool res) {
+            if (!res)
+                revert(
+                    " Error while withdrawing collateral: No error data generated"
+                );
+            emit CollateralWithdrawed(msg.sender, splitName, collateral);
+        } catch Error(string memory reason) {
             revert(reason);
         } catch {
-            splits[splitName].collateralWithdrawed[msg.sender] = false;
-            revert("No error data generated");
+            revert(
+                " Error while withdrawing collateral: No error data generated"
+            );
         }
-
-        emit CollateralWithdrawed(msg.sender, splitName, collateral);
     }
 
     function getMySplits(
@@ -426,7 +458,11 @@ contract Split {
         return splitData;
     }
 
-    function getMyTotalSplits() external view returns(uint){
+    function getMyTotalSplits() external view returns (uint) {
         return mySplits[msg.sender].length;
+    }
+
+    function withdrawFunds(uint amount) external onlyOwner {
+        owner.transfer(amount);
     }
 }
